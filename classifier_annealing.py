@@ -18,12 +18,13 @@ import os
 from keras.callbacks import ModelCheckpoint
 import pandas as pd
 import sys
-import keras 
+import keras
+import random
 from keras.callbacks import ReduceLROnPlateau
 from minio import Minio
 from minio.error import ResponseError
 
-fname = 'FordA'
+fname = 'FordA_R'
 x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
 x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
 nb_classes = len(np.unique(y_test))
@@ -58,4 +59,34 @@ for num in range(numClassifiers+1):
         models.append(model)
         print("Pushed "+filename)
 
-model = myClassifier.ensemble(models, x_test, Y_test, weights = [4,4,3,2,0])
+from simanneal import Annealer
+class OptimizeWeights(Annealer):
+    def move(self):
+        a = random.randint(0, len(self.state) - 1)
+        if (random.randint(0,1) == 0):
+            self.state[a] += 1
+        else:
+            if self.state[a] > 0:
+                self.state[a] -= 1
+
+    def energy(self):
+        accuracy = myClassifier.ensemble_model(classifiers, Y_test, numClassifiers, self.state)
+        e = 1 / accuracy
+        return e
+print("Checking models...")
+classifiers = myClassifier.ensemble_store_results(models,x_test)
+initialState = [ 1 for x in range(numClassifiers) ]
+print("Models loaded")
+del models, x_train, y_train
+#accuracy = myClassifier.ensemble_model(classifiers, Y_test, numClassifiers, initialState)
+
+optW = OptimizeWeights(initialState)
+
+optW.Tmin = 1
+optW.steps = 20000
+optW.updates = 10
+
+optimumWeights, optAccuracy = optW.anneal()
+print("Annealing finished!")
+print("Accuracy: "+str(1/optAccuracy))
+print(optimumWeights)

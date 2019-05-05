@@ -12,6 +12,7 @@ from __future__ import print_function
 from keras.models import Model
 from keras.utils import np_utils
 import numpy as np
+import myClassifier
 import os
 from keras.callbacks import ModelCheckpoint
 import pandas as pd
@@ -19,37 +20,19 @@ import sys
 import keras 
 import urllib3
 import shutil
+import operator
 from keras.callbacks import ReduceLROnPlateau
 
 from minio import Minio
 from minio.error import ResponseError
 
-def readucr(filename):
-    data = np.loadtxt(filename, delimiter = ',')
-    Y = data[:,0]
-    X = data[:,1:]
-    return X, Y
-
-def checkModel(model, X, Y):
-    print("checkModel:")
-    scores = model.evaluate(X, Y, verbose=1)
-    return scores[1] 
-
-def connectMinio():
-    httpClient = urllib3.PoolManager()
-    return Minio('172.17.0.1:9000',
-                  access_key='90WTMGQ1LA2VLTR635J3',
-                  secret_key='BK2REoMkJ9KO2WZcpAjaUgRw9vfOrY+ANEOeOnUd',
-                  secure=False,
-                  http_client=httpClient)
-
-
 myid = int(sys.argv[1])
-
+topClassifiers = 5
+i=1
 for noden in range(1,myid+1):
     fname = str(noden)#'FordA'
-    x_train, y_train = readucr(fname+'/'+fname+'_TRAIN')
-    x_test, y_test = readucr(fname+'/'+fname+'_TEST')
+    x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
+    x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
     nb_classes = len(np.unique(y_test))
     batch_size = int(min(x_train.shape[0]/10, 16))
     y_train = (y_train - y_train.min())/(y_train.max()-y_train.min())*(nb_classes-1)
@@ -97,14 +80,13 @@ for noden in range(1,myid+1):
     reduce_lr = ReduceLROnPlateau(monitor = 'loss', factor=0.5,
                       patience=50, min_lr=0.0001)
 
-    minioClient = connectMinio()
+    minioClient = myClassifier.connectMinio()
 
     #List all object paths in bucket that begin with my-prefixname.
     objects = minioClient.list_objects_v2(sys.argv[2], prefix='weights',
                                   recursive=False)
 
-    best_acc = 0
-    best_filename = ""
+    list_models = {}
     for obj in objects:
         filename=obj.object_name
         if not "-" + str(noden) + "-best" in filename:
@@ -113,13 +95,13 @@ for noden in range(1,myid+1):
         minioClient.fget_object(obj.bucket_name, filename, filename)
         if os.path.isfile(filename):
             model.load_weights(filename)
-            model_acc = checkModel(model,x_train,Y_train)
+            model_acc = myClassifier.checkModel(model,x_test,Y_test)
             print("Tested "+filename+" Model accuracy: "+str(model_acc*100))
-            if (model_acc > best_acc):
-                best_acc=model_acc
-                best_filename=filename
-    if (len(best_filename) > 0):
-        print("Best model number:"+best_filename)
-        shutil.copy2(best_filename,"weights-best-"+str(myid)+"classifier-"+str(noden)+".hdf5")
+            list_models[filename]=model_acc
+    sorted_v = sorted (list_models.items(), key=operator.itemgetter(1), reverse=True)
+    for value, key in sorted_v[0:topClassifiers]:
+        print("Model "+str(noden)+" :"+str(value))
+        shutil.copy2(str(value),"weights-best-"+str(myid*topClassifiers)+"classifier-"+str(i)+".hdf5")
+        i+=1
 
 
