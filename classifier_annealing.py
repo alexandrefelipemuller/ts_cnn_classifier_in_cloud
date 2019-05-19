@@ -24,7 +24,12 @@ from keras.callbacks import ReduceLROnPlateau
 from minio import Minio
 from minio.error import ResponseError
 
-fname = 'FordA_R'
+
+if len(sys.argv) < 2:
+    print("usage: classifier_anneal.py <number of all classifiers>\n example if you have 5 nodes top 5: 25")
+    sys.exit()
+
+fname = 'FordA'
 x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
 x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
 nb_classes = len(np.unique(y_test))
@@ -83,8 +88,8 @@ del models, x_train, y_train
 optW = OptimizeWeights(initialState)
 
 optW.Tmin = 1
-optW.steps = 20000
-optW.updates = 10
+optW.steps = 10000
+optW.updates = 200
 
 optimumWeights, optAccuracy = optW.anneal()
 print("Annealing finished!")

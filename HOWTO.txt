@@ -1,0 +1,37 @@
+This is implementation part of article "Cloud Computing Architecture for Time Series Ensemble Classification"
+
+*** Example of use ***
+
+Firt split the database in pieces. The data is UCR format in CSV comma separated (TimeSeries_TRAIN and TimeSeries_TEST)
+<class>,<value1>,<value2>....
+example: 1,0.69584365,0.59245434,0.49229594,...
+If you want to convert to this format a example of AWK script could be found in split_database.sh
+
+#using FordA database
+cd FordA
+# 1 - split database in 5 parts
+./split_base.sh 5
+
+# 2 - start minio server to receive the data
+sudo ./minio server data
+
+# 3 - edit myClassifier.py and change the connection details
+
+# 4 - Start docker with training.py or run it directly
+
+python3 training.py 1 targetbucket
+python3 training.py 2 targetbucket
+python3 training.py 3 targetbucket
+...
+
+# this example select top 5 classifiers of 4 nodes aka. 20 classifiers from targetbucket and store locally
+python3 selector.py 4 targetbucket
+
+# this loads all 20 classifiers and adjust the weight for the best ensemble classifier result
+python3 classifier_annealing.py 20 
+
+# classify using ensemble with the weights already learned
+python3 classifier.py 20
+
+# generate graphml from transfer learning
+python3 genGraph.py targetbucket

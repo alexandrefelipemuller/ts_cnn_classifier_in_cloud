@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Originally Created on Sun Oct 30 20:11:19 2016
 @author: stephen
+https://github.com/cauchyturing/UCR_Time_Series_Classification_Deep_Learning_Baseline
 
 Modified
 Alexandre F M Souza (UFPR)
@@ -17,29 +18,34 @@ from keras.callbacks import ModelCheckpoint
 import pandas as pd
 import sys
 import keras 
-import urllib3
 import random
 import myClassifier
+import re
 from keras.callbacks import ReduceLROnPlateau
 
 from minio import Minio
 from minio.error import ResponseError
 
 
-nb_epochs = 25
-first_round = 127
-rounds=150
+nb_epochs = 20
+first_round = 20
+rounds=100
 
-entropy=15
+entropy=10
 
-myid = int(sys.argv[1])
+if len(sys.argv) < 3:
+    print("usage: trainning.py <id> <target_bucket>")
+    sys.exit()
+myid = sys.argv[1]
+target_bucket = sys.argv[2]
+
 #flist = ['Adiac', 'Beef', 'CBF', 'ChlorineConcentration', 'CinC_ECG_torso', 'Coffee', 'Cricket_X', 'Cricket_Y', 'Cricket_Z', 
 #'DiatomSizeReduction', 'ECGFiveDays', 'FaceAll', 'FaceFour', 'FacesUCR', '50words', 'FISH', 'Gun_Point', 'Haptics', 
 #'InlineSkate', 'ItalyPowerDemand', 'Lighting2', 'Lighting7', 'MALLAT', 'MedicalImages', 'MoteStrain', 'NonInvasiveFatalECG_Thorax1', 
 #'NonInvasiveFatalECG_Thorax2', 'OliveOil', 'OSULeaf', 'SonyAIBORobotSurface', 'SonyAIBORobotSurfaceII', 'StarLightCurves', 'SwedishLeaf', 'Symbols', 
 #'synthetic_control', 'Trace', 'TwoLeadECG', 'Two_Patterns', 'uWaveGestureLibrary_X', 'uWaveGestureLibrary_Y', 'uWaveGestureLibrary_Z', 'wafer', 'WordsSynonyms', 'yoga']
 
-fname = str(myid)
+fname = myid
 x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
 x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
 nb_classes = len(np.unique(y_test))
@@ -71,20 +77,27 @@ reduce_lr = ReduceLROnPlateau(monitor = 'loss', factor=0.5,
                   patience=50, min_lr=0.0001)
 
 minioClient = myClassifier.connectMinio()
-if not minioClient.bucket_exists("cloudcl7"):
-     minioClient.make_bucket("cloudcl7", location="us-east-1")
+if not minioClient.bucket_exists(target_bucket):
+     minioClient.make_bucket(target_bucket, location="us-east-1")
 
 models_result = {}
 for round_n in range(first_round, rounds):
     #List all object paths in bucket that begin with my-prefixname.
-    objects = minioClient.list_objects('cloudcl7', prefix='weights',
+    objects = minioClient.list_objects(target_bucket, prefix='weights',
                                   recursive=True)
     best_acc = 0
     best_filename = ""
 
     for obj in objects:
         filename=obj.object_name
-        if str(myid) + "-best" in filename:
+        m = re.search('weights-([0-9]*)-([A-Za-z_0-9]*)-best.hdf5', filename)
+        if (myid == m.group(2) or int(m.group(1)) < round_n - 30): # if it the same node or older than 10 rounds, then skip it
+            try:
+                del models_result[filename]
+            except NameError:
+                pass
+            except KeyError:
+                pass
             continue
         print(obj.bucket_name, filename, obj.last_modified, obj.etag, obj.size, obj.content_type)
         try:
@@ -99,7 +112,7 @@ for round_n in range(first_round, rounds):
                 model_acc = myClassifier.checkSingleModel(model,x_train,Y_train,batch_size)
                 models_result[filename] = model_acc
             print("Tested "+filename+" Model accuracy: "+str(model_acc*100))
-            model_acc = (model_acc*10) * (random.randrange(1, entropy, 1) * ((rounds/round_n)-1) )
+            #model_acc = (model_acc*15) * (random.randrange(1, entropy, 1) * ((rounds/round_n)-1) )
             if (model_acc > best_acc):
                 best_acc=model_acc
                 best_filename=filename
@@ -107,7 +120,7 @@ for round_n in range(first_round, rounds):
         print("Best model number:"+best_filename)
         model.load_weights(best_filename)
     
-    localFilePath="temp_weights-"+str(myid)+".hdf5"
+    localFilePath="temp_weights-"+myid+".hdf5"
     checkpointer = ModelCheckpoint(localFilePath,
             monitor = 'val_acc',
             verbose=1,
@@ -126,13 +139,13 @@ for round_n in range(first_round, rounds):
     minioClient = myClassifier.connectMinio()
     try:
         metadata =  {
-        "Creator_id" : str(myid),
+        "Creator_id" : fname,
         "Creator_loss" : str(creator_loss),
         "Creator_acc" :  str(creator_acc),
         "Last_model" : best_filename
         }
-        remoteFilePath = "weights-"+str(round_n)+"-"+str(myid)+"-best.hdf5"
-        minioClient.fput_object('cloudcl7', remoteFilePath, localFilePath, metadata=metadata)
+        remoteFilePath = "weights-"+str(round_n)+"-"+myid+"-best.hdf5"
+        minioClient.fput_object(target_bucket, remoteFilePath, localFilePath, metadata=metadata)
     except ResponseError as err:
         print(err)
     os.rename(localFilePath, remoteFilePath)

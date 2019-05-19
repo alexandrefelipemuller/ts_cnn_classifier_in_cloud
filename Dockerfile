@@ -14,5 +14,5 @@ RUN pip install --trusted-host pypi.python.org -r requirements.txt
 ENV ID 4
 
 # Run app.py when the container launches
-CMD ["python", "app.py"]
+CMD ["python", "training.py $ID"]
 

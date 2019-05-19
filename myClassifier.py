@@ -52,7 +52,7 @@ def generateModel(x,nb_classes) -> Model:
     out = keras.layers.Dense(nb_classes, activation='softmax')(full)
 
 
-    model = Model(input=x, output=out)
+    model = Model(inputs=x, outputs=out)
      
     optimizer = keras.optimizers.Adam()
     model.compile(loss='categorical_crossentropy',

@@ -58,4 +58,5 @@ for num in range(numClassifiers+1):
         models.append(model)
         print("Pushed "+filename)
 
-model = myClassifier.ensemble(models, x_test, Y_test, weights = [4,4,3,2,0])
+model = myClassifier.ensemble(models, x_test, Y_test, weights = [2, 1, 3, 6, 0, 3, 4, 3, 1, 1, 7, 1, 6, 2, 2, 3, 1, 1, 1, 0, 2, 0, 2, 1, 3]
+)

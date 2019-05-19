@@ -30,7 +30,7 @@ myid = int(sys.argv[1])
 topClassifiers = 5
 i=1
 for noden in range(1,myid+1):
-    fname = str(noden)#'FordA'
+    fname = str(noden) #'FordA'
     x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
     x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
     nb_classes = len(np.unique(y_test))
