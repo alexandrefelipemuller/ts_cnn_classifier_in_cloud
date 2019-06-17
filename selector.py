@@ -26,11 +26,15 @@ from keras.callbacks import ReduceLROnPlateau
 from minio import Minio
 from minio.error import ResponseError
 
+if len(sys.argv) < 3:
+    print("usage: selector.py <number of classifiers> <target_bucket>")
+    sys.exit()
+
 myid = int(sys.argv[1])
-topClassifiers = 5
+topClassifiers = 1
 i=1
 for noden in range(1,myid+1):
-    fname = str(noden) #'FordA'
+    fname = 'FordA'#str(noden) #'FordA'
     x_train, y_train = myClassifier.readucr(fname+'/'+fname+'_TRAIN')
     x_test, y_test = myClassifier.readucr(fname+'/'+fname+'_TEST')
     nb_classes = len(np.unique(y_test))
@@ -92,7 +96,10 @@ for noden in range(1,myid+1):
         if not "-" + str(noden) + "-best" in filename:
             continue
         print(obj.bucket_name, filename, obj.last_modified, obj.etag, obj.size, obj.content_type)
-        minioClient.fget_object(obj.bucket_name, filename, filename)
+        try:
+            minioClient.fget_object(obj.bucket_name, filename, filename)
+        except FileNotFoundError:
+            pass
         if os.path.isfile(filename):
             model.load_weights(filename)
             model_acc = myClassifier.checkModel(model,x_test,Y_test)

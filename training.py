@@ -28,16 +28,16 @@ from minio.error import ResponseError
 
 
 nb_epochs = 20
-first_round = 20
-rounds=100
-
-entropy=10
+entropy=13
 
 if len(sys.argv) < 3:
     print("usage: trainning.py <id> <target_bucket>")
     sys.exit()
 myid = sys.argv[1]
 target_bucket = sys.argv[2]
+first_round = 1 #int(sys.argv[3])
+rounds=60 #int(sys.argv[4])
+
 
 #flist = ['Adiac', 'Beef', 'CBF', 'ChlorineConcentration', 'CinC_ECG_torso', 'Coffee', 'Cricket_X', 'Cricket_Y', 'Cricket_Z', 
 #'DiatomSizeReduction', 'ECGFiveDays', 'FaceAll', 'FaceFour', 'FacesUCR', '50words', 'FISH', 'Gun_Point', 'Haptics', 
@@ -112,7 +112,7 @@ for round_n in range(first_round, rounds):
                 model_acc = myClassifier.checkSingleModel(model,x_train,Y_train,batch_size)
                 models_result[filename] = model_acc
             print("Tested "+filename+" Model accuracy: "+str(model_acc*100))
-            #model_acc = (model_acc*15) * (random.randrange(1, entropy, 1) * ((rounds/round_n)-1) )
+            model_acc = (model_acc*15) * (random.randrange(1, entropy, 1) * ((rounds/round_n)-1) )
             if (model_acc > best_acc):
                 best_acc=model_acc
                 best_filename=filename

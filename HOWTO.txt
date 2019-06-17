@@ -17,12 +17,21 @@ sudo ./minio server data
 
 # 3 - edit myClassifier.py and change the connection details
 
-# 4 - Start docker with training.py or run it directly
+# 4 - Start docker with training.py
+#4.1
+Build docker image
+	docker build -t cnn_cloud .
+	docker container run cnn_cloud python3 training.py 1 testbucket &
+	docker container run cnn_cloud python3 training.py 2 testbucket &
+	docker container run cnn_cloud python3 training.py 3 testbucket &
+	...
 
-python3 training.py 1 targetbucket
-python3 training.py 2 targetbucket
-python3 training.py 3 targetbucket
-...
+#4.2 or run it directly
+
+	python3 training.py 1 targetbucket &
+	python3 training.py 2 targetbucket &
+	python3 training.py 3 targetbucket &
+	...
 
 # this example select top 5 classifiers of 4 nodes aka. 20 classifiers from targetbucket and store locally
 python3 selector.py 4 targetbucket
